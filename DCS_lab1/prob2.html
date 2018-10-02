@@ -14,7 +14,7 @@
 <h1>DCS - 1.2 Affine transformations</h1>
 
 <canvas id="canvas1" height="600" width="400" class="bezier"  style="border:1px solid #d3d3d3;"></canvas>
-<canvas id="canvas2" height="600" width="400" class="bezier"  style="border:1px solid #d3d3d3;"></canvas>
+<canvas id="canvas2" height="600" width="800" class="bezier"  style="border:1px solid #d3d3d3;"></canvas>
 <br>
 <button type="button" onclick="doReset()">Reset</button>
 <button type="button" onclick="doScalingEx()">(Example) Scale by 0.5</button>
@@ -97,6 +97,11 @@ Line: m <input type="number" name="NumM"  id="NumM" min="-100" max="100" step="0
 
         // Transformed points
         drawCurve(context2, style, points, myTransformation); // Draw curve transformed
+
+
+        var m = parseFloat(document.getElementById("NumM").value);
+        var n = parseFloat(document.getElementById("NumN").value);
+        drawLine(m, n, context1);
     }
 
 
@@ -158,6 +163,22 @@ Line: m <input type="number" name="NumM"  id="NumM" min="-100" max="100" step="0
             ctx.beginPath();
             ctx.arc(p.x, p.y, style.point.radius, style.point.arc1, style.point.arc2, true);
             ctx.fill();
+            ctx.stroke();
+        }
+    }
+
+
+
+    function drawLine(m, n, ctx) {
+
+        ctx.beginPath();
+        ctx.strokeStyle="#FF0000";
+        var Y = 200*m + n;
+        ctx.moveTo(-200,  Y);
+
+        for (var X = -1000 ; X < 1001; X += 50) {
+            Y = -m*X + n;
+            ctx.lineTo(X, Y);
             ctx.stroke();
         }
     }
@@ -316,20 +337,7 @@ Line: m <input type="number" name="NumM"  id="NumM" min="-100" max="100" step="0
         return transformedPoint;
     }
 
-    function drawLine(m, n) {
-
-        context2.beginPath();
-        context2.strokeStyle="#FF0000";
-        var Y = 200*m + n;
-        context2.moveTo(-200,  Y);
-
-        for (var X = -200 ; X < 250; X += 50) {
-            Y = -m*X + n;
-            context2.lineTo(X, Y);
-            context2.stroke();
-        }
-    }
-
+    
 
     var reflectFunction = function (point) {
         var m = parseFloat(document.getElementById("NumM").value);
@@ -342,7 +350,17 @@ Line: m <input type="number" name="NumM"  id="NumM" min="-100" max="100" step="0
             [Math.sin(angle), -Math.cos(angle)]
         ]);
 
-        var pointAsArray = [point.x, point.y - n];
+
+        var f1 = (1 - m*m)/(1 + m*m);
+        var fd = (m+m)/(1 + m*m);
+        var f2 = (m*m - 1)/(1 + m*m);
+
+        var matrix = math.matrix([ 
+            [f2, fd],
+            [fd, f1]
+        ]);
+
+        var pointAsArray = [point.x, -point.y + n];
         var result = math.multiply(matrix, pointAsArray); // result is a matrix!
         var transformedPoint = {x: result.get([0]),  y: result.get([1])};
         return transformedPoint;
@@ -377,7 +395,7 @@ Line: m <input type="number" name="NumM"  id="NumM" min="-100" max="100" step="0
         myTransformation = reflectFunction;
         drawCanvas();
 
-        drawLine(m, n);
+        drawLine(m, n, context2);
     }
 
 

@@ -14,7 +14,7 @@
 <h1>DCS - 1.3 Affine transformations</h1>
 
 <canvas id="canvas1" height="600" width="400" class="bezier"  style="border:1px solid #d3d3d3;"></canvas>
-<canvas id="canvas2" height="600" width="400" class="bezier"  style="border:1px solid #d3d3d3;"></canvas>
+<canvas id="canvas2" height="600" width="800" class="bezier"  style="border:1px solid #d3d3d3;"></canvas>
 <br>
 <button type="button" onclick="doReset()">Reset</button>
 <button type="button" onclick="doScalingEx()">(Example) Scale by 0.5</button>
@@ -25,12 +25,19 @@
 <button type="button" onclick="doCentral2()">Central projection Y</button>
 
 
+
 <br>
 <br>
 Modify X by <input type="number" name="NumX"  id="NumX" min="-1000" max="1000" step="50" value="5"> 
 | Modify Y by <input type="number" name="NumY"  id="NumY" min="-1000" max="1000" step="50" value="5"> 
 | Angle (degs): <input type="number" name="Rot" id="Rot" min="0" max="360" step="0.1" value="90">
 <br>
+<br>
+
+<strong>Which projection preserves affinity?</strong> Parallel projection <br>
+<br><strong>Why?</strong> Affinity means that the function applied preserves points, lines and vectors through its space, but not necessarily their distances between two distinct points, or the angles between two distinct lines. This also means that parallel lines will remain parallel, which is what (obviously) happens with parallel projection. On the other hand, central projection focuses all the points into one, which prevents this preservation as, for example, vector directions will change.
+
+
  
 <script type="text/javascript">
 
