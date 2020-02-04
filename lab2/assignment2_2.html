@@ -1,0 +1,284 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>DCS - 2.2</title>
+
+    <!--- Math.js library, for matrix manipulation, and many other things--->
+    <script src=https://cdnjs.cloudflare.com/ajax/libs/mathjs/3.3.0/math.min.js></script>
+</head>
+
+<body>
+
+<h1>DCS - 2.2 Properties of conics</h1>
+
+<canvas id="canvas1" height="600" width="600" class="bezier"  style="border:1px solid #d3d3d3;"></canvas>
+<br>
+<button type="button" onclick="doReset()">Reset</button>
+<button type="button" onclick="computeConic()">Draw some conic</button>
+
+
+<script type="text/javascript">
+
+    /*
+    * Part of this code is based on:
+        * http://blogs.sitepoint.com/html5-canvas-draw-quadratic-curves/
+        * http://blogs.sitepoint.com/html5-canvas-draw-bezier-curves/
+    */
+
+    var canvas1, context1, points, rays, myTransformation, style, drag = null, draggedPoint;
+
+    // TODO replace these points but those of the corresponding conic function (on-the-fly)
+    points = [{}];
+    rays = [-240, -160, -80, 0, 80, 160, 240];
+
+
+
+    function init() {
+
+        myTransformation = function(p){return p}; //Identity transform
+
+        // default styles
+        style = {
+            curve:  { width: 6, color: "#333" },
+            line:   { width: 2, color: "#C00" },
+            line2:   { width: 1, color: "#00F" },
+            point: { radius: 3, width: 2, color: "#990", fill: "rgba(200,200,200,0.5)", arc1: 0, arc2: 2 * Math.PI }
+        }
+
+        // line style defaults
+        context1.lineCap = "round";
+        context1.lineJoin = "round";
+
+        // Translate origin to center of canvas
+        //context1.translate(50, canvas1.height/2);
+        context1.translate(canvas1.width/2,canvas1.height - 100);
+		
+		// Flip y-axis, so it looks like in standard math axes
+		context1.scale(1,-1) // Reversed y-axis
+
+        drawCanvas();
+    }
+
+
+    /**
+     Basic drawing methods
+     **/
+
+
+    // draw canvas
+    function drawCanvas() {
+        // Clear everything
+        context1.clearRect(0, 0, canvas1.width, canvas1.height);  // Clear canvas
+
+        // Background grids
+        drawGrid(context1, 2*canvas1.width, 2*canvas1.height); // Draw background grid
+
+        // Original points and vertices
+        drawCurve(context1, style, points); // Draw curve
+        drawVertices(context1, style, points); // Draw vertices as circles
+
+    }
+
+
+    // Draw a background grid
+    function drawGrid(myContext,bw,bh){
+        var delta = 50; // grid cell size
+
+        var half_width = bw/2;
+        var half_height = bh/2;
+        for (var x = -half_width; x <= half_width; x += delta) {
+            myContext.moveTo(x, -half_height);
+            myContext.lineTo(x, half_height);
+        }
+
+        for (var y = -half_height; y <= half_height; y += delta) {
+            myContext.moveTo(-half_width, y);
+            myContext.lineTo(half_width , y);
+        }
+
+        myContext.lineWidth = 1;
+        myContext.strokeStyle = "lightgray";
+        myContext.stroke();
+
+   
+
+    }
+
+    // Draws a polygonal curve connecting the points, after applying the given transformation
+    function drawCurve(ctx, style, points, transformation) {
+        // The transformation is optional. If none provided, use identity transform
+        if (transformation===undefined) {
+            transformation = function(p){return p}; //Identity transform
+        }
+
+        // Draw curve
+        ctx.lineWidth = style.curve.width;
+        ctx.strokeStyle = style.curve.color;
+        ctx.beginPath();
+        var firstPoint = transformation(points[0]);
+        var currentPoint;
+        ctx.moveTo(firstPoint.x, firstPoint.y);
+        for (var i = 0; i < points.length; i++) {
+            currentPoint =  transformation(points[i]);
+            ctx.lineTo(currentPoint.x, currentPoint.y);
+            ctx.moveTo(currentPoint.x, currentPoint.y);
+        }
+        ctx.stroke();
+    }
+
+
+    // Draws a polygonal line
+    function drawRays() {
+        // The transformation is optional. If none provided, use identity transform
+
+        
+        
+        for (var i = 0; i < rays.length; i++) {
+        
+            context1.lineWidth   = style.line.width;
+            context1.strokeStyle = style.line.color;
+            // Draw curve
+            context1.beginPath();
+
+            var Xray = rays[i];
+            var ray = {x: Xray, y: 10001};
+            context1.moveTo(ray.x, ray.y);
+
+            for (var j = 10000; j >= (Xray*Xray)/200; j--) {
+                context1.lineWidth   = style.line.width;
+                context1.strokeStyle = style.line.color;
+                ray.y = j;
+                context1.lineTo(ray.x, ray.y);
+                context1.moveTo(ray.x, ray.y);
+            }
+            context1.stroke();
+            //Get slope (== m) parabola 
+            var m = ray.x * 0.01; 
+
+            context1.lineWidth   = style.line2.width / 2;
+            context1.strokeStyle = style.line2.color;
+            context1.beginPath();
+
+
+            /*
+            The magic of the function.
+            The tangent of the angle is TA=atan(m). To the ray that comes into the parabola there's a 90deg angle of difference. 
+            Now we have 90deg+TA.
+            To the perpendicular of said tangent, we calculate it as (90deg + TA) - 90deg = TA. The reflected line, the one we care about, we add TA (right from before) to the 90deg+TA => 90deg + 2TA. 90deg is represented as PI/2 and the 2TA is just 2*atan(m). To get the slope I encapsulate all these steps into the tangent function, to get the reflected slope => atan(2TA + 90deg)
+
+            Finally, I apply the cotangent to "remove" that ugly 90deg movement :-)
+
+            (That said, Math.cot(x) seemingly failed, so I did the cotangent naïvely)
+            */
+            var m2 = 1 / Math.tan(2*Math.atan(-m));
+            
+            
+            
+            var OFFSET = 0;
+            y1 = m*ray.x - ray.y;
+            context1.moveTo(ray.x, y1);
+
+            y2 = m2*(-10 * ray.x) +ray.y;
+            context1.lineTo(-9 * ray.x, y2);
+            context1.moveTo(-9 * ray.x, y2);
+            //Line is moved x-1 times in respect to ray.x due to an extra movement done in the "negative" X coordinate.
+
+            if (i == (rays.length-1)) {
+
+                y2 = m2*(-1 * ray.x) +ray.y;
+                alert("The Focus of the parabola on X=0 is Y=" + y2);
+            }
+
+            context1.stroke();
+        }
+        //context1.stroke();
+    }
+
+    // Draw circles around vertices to facilitate drag and drop
+    function drawVertices (ctx, style, points) {
+        for (var i = 0; i < points.length; i++) {
+            var p = points[i];
+            ctx.lineWidth = style.point.width;
+            ctx.strokeStyle = style.point.color;
+            ctx.fillStyle = style.point.fill;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, style.point.radius, style.point.arc1, style.point.arc2, true);
+            ctx.fill();
+            ctx.stroke();
+        }
+
+        /*REMOVE THIS
+        ctx.lineWidth = style.line2.width;
+        ctx.strokeStyle = style.line2.color;
+        ctx.beginPath();
+        ctx.arc(0, 50, style.point.radius, style.point.arc1, style.point.arc2, true);
+        ctx.fill();
+        ctx.stroke();*/
+    }
+
+
+    /**
+     * Start ("main method")
+     */
+
+    // Assign canvas and context variables
+    canvas1 = document.getElementById("canvas1");
+    context1 = canvas1.getContext("2d");
+
+    init();
+
+    /**
+     * Auxiliary functions
+     */
+
+
+    function doReset () {
+        myTransformation = function(p){return p}; //Identity transform
+        drawCanvas();
+    }
+
+    // This is just an example
+    function computeConic() {
+        // to something
+        
+        //alert('Code to be written!');
+        
+        points = [{}];
+        var currentPoint;
+
+        for (var t = -500; t <= 500; t+=25) {
+            currentPoint =  {
+                x: t,
+                y: t*t / 200
+            };
+            console.log(currentPoint);
+
+            points.push(currentPoint);
+        //alert('point placed');
+        }
+
+        console.log(points);
+        console.log(points);
+
+        drawCanvas();
+        drawRays();
+
+    }
+
+</script>
+
+<h2>REASONING:</h2>
+
+<p>
+    We need to get:
+<ol>
+    <li>The slope of the tangent, and its perpendicular line that hits the reflecting point</li>
+    <li>The angle (<i>a</i>) between the reflection line and the perpendicular tangent</li>
+</ol>
+</p>
+<p>Once we've gotten this, all we have to do is to draw a line from the reflecting point with the same angle as the reflecting line through the perpendicular, except this time it's inverted. That is, if the angle we have is <i>a</i> degrees in respect to the perpendicular, the line we want will have an angle of <i>-a</i> degrees to the perpendicular. <br> The point where X=0 is the point where the focus is found, as evidenced by the fact that multiple lines hit the same point on X=0</p>
+
+</body>
+</html>

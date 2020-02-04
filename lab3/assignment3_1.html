@@ -1,0 +1,383 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>DCS - 3.1</title>
+
+    <!--- Math.js library, for matrix manipulation, and many other things--->
+    <script src=https://cdnjs.cloudflare.com/ajax/libs/mathjs/3.3.0/math.min.js></script>
+</head>
+
+<body>
+
+<h1>DCS - 3.1. Cubic Lagrange interpolation</h1>
+
+<canvas id="canvas1" height="600" width="800" class="bezier"  style="border:1px solid #d3d3d3;"></canvas>
+<br>
+
+
+<script type="text/javascript">
+
+    /*
+    * Part of this code is based on:
+        * http://blogs.sitepoint.com/html5-canvas-draw-quadratic-curves/
+        * http://blogs.sitepoint.com/html5-canvas-draw-bezier-curves/
+    */
+
+    var canvas1, context1, points, myTransformation, style, drag = null, draggedPoint;
+
+    points = [
+        {x: 100, y: 100},
+        {x: 200, y: 300},
+        {x: 350, y: 200}, 
+        {x: 600, y: 350}
+    ];
+
+
+    function init() {
+
+        myTransformation = function(p){return p}; //Identity transform
+
+        // default styles
+        style = {
+            curve:  { width: 6, color: "#333333" },
+            curve2: { width: 2, color: "#33FF33" },
+            line:	{ width: 1, color: "#C00" },
+            point: { radius: 10, width: 2, color: "#900", fill: "rgba(200,200,200,0.5)", arc1: 0, arc2: 2 * Math.PI }
+        }
+
+        // line style defaults
+        context1.lineCap = "round";
+        context1.lineJoin = "round";
+
+        // event handlers (only canvas1)
+        canvas1.onmousedown = dragStart;
+        canvas1.onmousemove = dragging;
+        canvas1.onmouseup = canvas1.onmouseout = dragEnd;
+
+        drawCanvas();
+    }
+
+
+    /**
+     Basic drawing methods
+     **/
+
+
+    // draw canvas
+    function drawCanvas() {
+        // Clear everything
+        context1.clearRect(0, 0, canvas1.width, canvas1.height);  // Clear canvas
+
+        // Background grids
+        drawGrid(context1,canvas1.width, canvas1.height); // Draw background grid
+
+        // Curve through points and vertices
+        drawCurve(context1, style, points); // Draw curve
+        drawVertices(context1, style, points); // Draw vertices as circles
+
+        drawPolynomial();
+        drawParametric();
+        drawParametricUP();
+
+    }
+
+
+    // Draw a background grid
+    function drawGrid(myContext,bw,bh){
+        var delta = 50; // grid cell size
+
+        for (var x = 0; x <= bw; x += delta) {
+            myContext.moveTo(x, 0);
+            myContext.lineTo(x, bh);
+        }
+
+        for (var y = 0; y <= bh; y += delta) {
+            myContext.moveTo(0, y);
+            myContext.lineTo(bw , y);
+        }
+
+        myContext.lineWidth = 1;
+        myContext.strokeStyle = "lightgray";
+        myContext.stroke();
+
+        myContext.strokeStyle = "black";
+        myContext.font = "12px Arial";
+        myContext.fillText("(0,0)",2,12);
+
+    }
+
+    // Draws a polygonal curve connecting the points, after applying the given transformation
+    function drawCurve(ctx, style, points, transformation) {
+        // The transformation is optional. If none provided, use identity transform
+        if (transformation===undefined) {
+            transformation = function(p){return p}; //Identity transform
+        }
+
+        // Draw curve
+        ctx.lineWidth = style.curve.width;
+        ctx.strokeStyle = style.curve.color;
+        ctx.beginPath();
+        var firstPoint = transformation(points[0]);
+        var currentPoint;
+        ctx.moveTo(firstPoint.x, firstPoint.y);
+        for (var i = 0; i < points.length; i++) {
+            currentPoint =  transformation(points[i]);
+            ctx.lineTo(currentPoint.x, currentPoint.y);
+            ctx.moveTo(currentPoint.x, currentPoint.y);
+        }
+        ctx.stroke();
+    }
+
+    // Draw circles around vertices to facilitate drag and drop
+    function drawVertices (ctx, style, points) {
+        for (var i = 0; i < points.length; i++) {
+            var p = points[i];
+            ctx.lineWidth = style.point.width;
+            ctx.strokeStyle = style.point.color;
+            ctx.fillStyle = style.point.fill;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, style.point.radius, style.point.arc1, style.point.arc2, true);
+            ctx.fill();
+            ctx.stroke();
+        }
+    }
+
+    /**
+     Methods to allow dragging transformedPoints around
+     **/
+
+    // start dragging
+    function dragStart(e) {
+        e = mousePos(e);
+        var dx, dy;
+        for (var i=0; i<points.length;i++) {
+            dx = points[i].x - e.x;
+            dy = points[i].y - e.y;
+            if ((dx * dx) + (dy * dy) < style.point.radius * style.point.radius) {
+                drag = i;
+                draggedPoint = e;
+                canvas1.style.cursor = "move";
+                return;
+            }
+        }
+    }
+
+    // dragging
+    function dragging(e) {
+        if (drag!=null) {
+            e = mousePos(e);
+            points[drag].x += e.x - draggedPoint.x;
+            points[drag].y += e.y - draggedPoint.y;
+            draggedPoint = e;
+            drawCanvas();
+        }
+    }
+
+    // end dragging
+    function dragEnd(e) {
+        drag = null;
+        canvas1.style.cursor = "default";
+        drawCanvas();
+    }
+
+    // event parser
+    function mousePos(event) {
+        event = (event ? event : window.event);
+        return {
+            x: event.pageX - canvas1.offsetLeft,
+            y: event.pageY - canvas1.offsetTop
+        }
+    }
+
+    /**
+     * Start ("main method")
+     */
+
+    // Assign canvas and context variables
+    canvas1 = document.getElementById("canvas1");
+    context1 = canvas1.getContext("2d");
+
+    init();
+
+/////////////////////////////////////////////////////////////
+//                      PROBLEM 1 A                        //
+/////////////////////////////////////////////////////////////
+
+    function prods(t, i){
+        var multi = 1;
+        for(var j = 0; j < points.length; j++) {
+            if (i != j) {
+                multi *= ((t - points[j].x) / (points[i].x - points[j].x));
+            }
+        }
+        return multi;
+     }
+
+    // Ripped out of
+    // https://en.wikipedia.org/wiki/Lagrange_polynomial#Definition
+    function getPolynomial() {
+        interPoints = [];
+
+        for (var t = 0; t <= 800; t++){
+            var acum = 0;
+            for(var i = 0; i < points.length; i++) {
+                acum += (points[i].y * prods(t, i));
+            }
+            interPoints.push(acum);
+        }
+        return interPoints;
+    }
+
+
+    function drawPolynomial() {
+        interPts = getPolynomial();
+        // Draw curve
+        context1.lineWidth = style.curve2.width;
+        context1.strokeStyle = "pink";
+        context1.beginPath();
+
+        var firstPoint = points[0];
+        var currentPoint;
+        context1.moveTo(0, 0);
+
+        //for (var t=points[0].x; t<=points[points.length-1].x; t++){
+        for (var t=0; t<=interPts.length; t++){
+            context1.lineTo(t, interPts[t]);
+            context1.moveTo(t, interPts[t]);
+        }
+        context1.stroke();
+    }
+
+/////////////////////////////////////////////////////////////
+//                      PROBLEM 1 B                        //
+/////////////////////////////////////////////////////////////
+
+    function dist(a, b) {
+        return Math.sqrt(Math.pow(b.x-a.x, 2)+Math.pow(b.y-a.y, 2));
+    }
+
+
+    function distancesUniformPoints() {
+        var dwp = [];
+        var n = points.length;
+        for (let i = 0; i < n && 1<n; ++i) {
+            dwp.push( i/(n-1) );
+        }
+        return dwp;
+    }
+
+    function distanceNonUniformPoints() {
+        var dists = [0];
+        var dwp   = [ ];
+        var sum = 0;
+        for (var i = 0; i < points.length-1; i++) {
+            var distRes = dist(points[i], points[i+1]);
+            sum += distRes;
+            dists.push(distRes);
+        }
+        /*for (var i = 0; i < dists.length; i++) {
+            dists[i] = dists[i]/sum;f
+        }*/
+
+        var acum = 0;
+        for (var i = 0; i < dists.length; i++) {
+            dists[i] = dists[i]/sum; //Normalize
+            acum += dists[i];
+            dwp.push(acum);
+        }
+        return dwp;
+    }
+
+
+
+
+//  function parametricLagrange(t, points, weights) {
+    function subParam(t, i, dwp){
+        var top = 1;
+        var btm = 1;
+        for(var j = 0; j < points.length; j++) { 
+            if (i != j) {
+                top *= (t      - dwp[j]);
+                btm *= (dwp[i] - dwp[j]);
+            }
+        }
+        return top/btm;
+    }
+
+
+    function parametricLagrange(t, weights) {
+        var t1 = weights[0];        var t2 = weights[1];
+        var t3 = weights[2];        var t4 = weights[3];
+
+        var calc = [0,0,0,0];
+        calc[0] = ((t-t2)*(t-t3)*(t-t4)) / ((t1-t2) * (t1-t3) * (t1-t4));
+        calc[1] = ((t-t1)*(t-t3)*(t-t4)) / ((t2-t4) * (t2-t3) * (t2-t1));
+        calc[2] = ((t-t1)*(t-t2)*(t-t4)) / ((t3-t2) * (t3-t1) * (t3-t4));
+        calc[3] = ((t-t1)*(t-t2)*(t-t3)) / ((t4-t2) * (t4-t3) * (t4-t1));
+
+        var sumX = 0; var sumY = 0;
+        
+        for (var i = 0; i < 4; ++i) {
+            sumX += calc[i] * points[i].x;
+            sumY += calc[i] * points[i].y
+        }
+
+       return {x: sumX , y: sumY };
+        
+    }
+
+
+
+   function drawParametric() {
+        var w = distanceNonUniformPoints();
+        //interPts = distanceNonUniformPoints();
+        
+        // Draw curve
+        context1.lineWidth = style.curve2.width;
+        context1.strokeStyle = "orange";
+        context1.beginPath();
+
+        var firstPoint = points[0];
+        var currentPoint = parametricLagrange(0, w);
+        console.log(currentPoint);
+
+        //for (var t=points[0].x; t<=points[points.length-1].x; t++){
+        for (var t=0; t<1; t+=0.001){
+            myPoint = parametricLagrange(t, w);
+            context1.lineTo(myPoint.x, myPoint.y);
+            context1.moveTo(myPoint.x, myPoint.y);
+        }
+        context1.stroke();
+    }
+
+
+   function drawParametricUP() {
+        var w = distancesUniformPoints();
+        //interPts = distanceNonUniformPoints();
+        
+        // Draw curve
+        context1.lineWidth = style.curve2.width;
+        context1.strokeStyle = "blue";
+        context1.beginPath();
+
+        var firstPoint = points[0];
+        var currentPoint = parametricLagrange(0, w);
+        console.log(currentPoint);
+
+        //for (var t=points[0].x; t<=points[points.length-1].x; t++){
+        for (var t=0; t<1; t+=0.001){
+            myPoint = parametricLagrange(t, w);
+            context1.lineTo(myPoint.x, myPoint.y);
+            context1.moveTo(myPoint.x, myPoint.y);
+        }
+        context1.stroke();
+    }
+
+
+
+</script>
+<p>Pink is uniform BUT , Orange is uniform with equally-distributed weights, blue is non-uniform</p>
+</body>
+</html>
